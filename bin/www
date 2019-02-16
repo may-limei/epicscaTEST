@@ -1,0 +1,259 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+// var epicsPV = require('../public/javascripts/epicsPV');
+var app = require('../app');
+var debug = require('debug')('epicscatest:server');
+var http = require('http');
+var epics = require('epics');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+var io = require('socket.io')(server);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+// server.listen(port);
+server.listen(port,'0.0.0.0',function(){
+  console.log("Express server listening on port " + app.get('port'));
+});
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
+
+// Date.prototype.Format = function (fmt) { //author: meizz 
+//   var o = {
+//       "M+": this.getMonth() + 1, //月份 
+//       "d+": this.getDate(), //日 
+//       "h+": this.getHours(), //小时 
+//       "m+": this.getMinutes(), //分 
+//       "s+": this.getSeconds(), //秒 
+//       // "q+": Math.floor((this.getMonth() + 3) / 3), //季度 
+//       "S": this.getMilliseconds() //毫秒 
+//   };
+//   if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+//   for (var k in o)
+//   if (new RegExp("(" + k + ")").test(fmt)) fmt = fmt.replace(RegExp.$1, (RegExp.$1.length == 1) ? (o[k]) : (("00" + o[k]).substr(("" + o[k]).length)));
+//   return fmt; 
+// }  
+var moment = require('moment');
+moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+
+
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Define PVs
+ */
+var pvs={
+  leds:[
+		{ pvname: "may:led0" }, { pvname: "may:led1" }, { pvname: "may:led2" },
+		{ pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname: "may:led7" }]
+}
+
+
+/**
+ * Socket Events for change of value  or severity
+ * 监听变量值的变化或报警状态的变化
+ *  */
+io.on('connection', function (socket) {
+  
+  connect_pvs(pvs.leds,function(err,results){
+    async.map(results,function(item,callback){
+      item.on("value", function(data) {
+      // console.log('Value:',item.pvName,data);
+      socket.emit(item.pvName, data);
+      // console.log(item.pvName+" value change socket event emit");
+      // console.log(item.pvName+" "+moment().format('YYYY-MM-DD HH:mm:ss.SSS')+" 【"+data+"】 value changed (Server emit) ");
+      console.log("(Server emit) "+item.pvName+" "+moment().format('YYYY-MM-DD HH:mm:ss.SSS')+" 【"+data+"】");
+      });  
+    })
+  });
+  
+  connect_pvs_SEVR(pvs.leds,function(err,results){
+    async.map(results,function(item,callback){
+      item.on("value", function(data) {
+      console.log('Value:',item.pvName,data);
+      socket.emit(item.pvName, data);
+      console.log(item.pvName+" severity change socket event emit")
+      });  
+    })
+  });
+ 
+  connect_pvs(pvs.ao,function(err,results){
+    async.map(results,function(item,callback){
+      item.on("value", function(data) {
+      console.log('Value:',item.pvName,data);
+      socket.emit(item.pvName, data);
+      console.log(item.pvName+" value change socket event emit")
+      });  
+    })
+  });
+  
+  connect_pvs_SEVR(pvs.ao,function(err,results){
+  async.map(results,function(item,callback){
+    item.on("value", function(data) {
+    console.log('Value:',item.pvName,data);
+    socket.emit(item.pvName, data);
+    console.log(item.pvName+" value change socket event emit")
+    });  
+  })
+ });
+
+
+  /**
+   *  监测AO :客户端的变量设定
+   *  Monitor AO : configure from the web client;
+   */
+    connect_pvs(pvs.ao,function(err,results){
+      async.map(results,function(item,callback){
+        socket.on(item.pvName, function(data) {
+        console.log('Value:',item.pvName,data);
+        item.put(item.pvName, data);
+        console.log(item.pvName+"Set pv value from web client  ")
+         });  
+        })
+    });
+  
+   });
+
+
+/**
+ * PV创建并监听异步回调 
+ */
+async= require('async');
+
+function connect_pvs(pvs,callback){
+    async.map(pvs, function(item, callback) {
+        // console.log(item.pvname+" is connect*");
+       var pv = new epics.Channel(item.pvname);
+       pv.connect(function(err) {
+       if(pv.state()){
+          pv.monitor()};
+          callback(null,pv);
+          console.log(item.pvname+" is connected*");
+      });
+    }, function(err,results){
+         callback(err,results); 
+  });
+};
+
+function connect_pvs_SEVR(pvs,callback){
+    async.map(pvs, function(item, callback) {
+        // console.log(item.pvname+" is connect*");
+       var pv = new epics.Channel(item.pvname+".SEVR");
+       pv.connect(function(err) {
+       if(pv.state()){
+          pv.monitor()};
+          callback(null,pv);
+          console.log(item.pvname+"alarm severity is monitored*");
+      });
+    }, function(err,results){
+         callback(err,results); 
+  });
+};
+
+
+var fs=require('fs');
+var options={
+  flag:'a'  //文件追加内容，而不是覆盖文件内容
+};
+function createPV(pvname){
+  fs.writeFile(
+    '/home/may/pro/pvs/db/leds.db',
+    '\nrecord(calc, "$(user):'+pvname+'")\n  {\n  field(DESC, "Counter from 0 to 255")\n  field(SCAN, ".5 second")\n  field(CALC, "(A<256)?A+B:0")\n  field(INPA, "$(user):'+pvname+'.VAL NPP NMS")\n  field(INPB, "1")\n  field(EGU, "Counts")\n  field(HOPR, "10")\n  }',
+    options,function(err){
+      if(err){
+        console.log(pvname+'写入操作失败.');
+      } else{
+        console.log(pvname+'写入操作成功.');
+      }
+    }
+  );
+  // pvs={
+  //   leds:[
+  //     { pvname: "may:led0" }, { pvname: "may:led1" }, { pvname: "may:led2" },
+  //     { pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname: "may:"+pvname }]
+  // }
+}
+fs.readFile('/home/may/pro/pvs/db/leds.db',function(err,data){
+  if(err) {console.log('写入操作失败.');}
+  else {
+    if(data.toString().indexOf("led7")<0) { //若不含led7记录，则添加记录led7
+      createPV("led7");
+    }
+  }
+});

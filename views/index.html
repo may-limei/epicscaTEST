@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="utf-8" />
+<title>epicsCA 接口测试</title>
+<link rel="shortcut icon" href="images/favicon.ico" />
+<script src="javascripts/angular.min.js"></script>
+<script src="javascripts/socket.io.js"></script>
+<script src="javascripts/async.js"></script> 
+</head>
+
+<body ng-app="myApp" ng-controller="ledsCtrl">
+    <div>
+		<p> 这是epicsCA的web接口测试</p>
+		<p>led7:{{led7}}</p>
+    </div>
+
+    <script>
+        //socket模块和epics变量模块定义
+		var serverIP="10.10.33.102";
+		var socket = io.connect(serverIP+':3000');
+		var pvs = {
+			leds:[
+				{ pvname: "may:led0" }, { pvname: "may:led1" }, { pvname: "may:led2" },
+				{ pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname:"may:led7" }]
+		}
+	</script>
+	
+	<script>
+		/* start - angularJS script */
+		var app = angular.module('myApp', []);
+
+		
+		/* start - 自定义函数factory =>  使用一些JS语法或函数*/
+		app.factory('JsService', function(){
+			var factory = {};
+			factory.mod = function(x,y){
+				return x%y;
+			};
+			factory.toString = function(val,num){
+				return val.toString(num);
+			};
+			return factory;
+		});
+		/* end - 自定义函数factory =>  使用一些JS语法或函数*/
+		
+		/* start - ledsCtrl */
+		app.controller('ledsCtrl', function ($scope, JsService) {
+			$scope.valled=[0,0,1,0,1,1];
+			$scope.led4=4;
+			$scope.led5=5;
+			$scope.led7=7;
+
+			async.map(pvs.leds, function (item, callback) {
+				socket.on(item.pvname, function (data) {
+					$scope.$apply(function () {	//手动出发脏检查。必须有这步才能自动通知angular的module和controller，$scope.bang发生变化了。详见腾讯课堂教程《$scope》节
+						switch (item.pvname) {
+							case "may:led0":
+								$scope.valled[0]=data;
+								break;
+							case "may:led1":
+								$scope.valled[1]=data;
+								break;
+							case "may:led2":
+								$scope.valled[2]=data;
+								break;
+							case "may:led3":
+								$scope.valled[3]=data;
+								break;
+							case "may:led4":
+								$scope.led4=data;
+								break;
+							case "may:led5":
+								$scope.led5=data;
+								break;
+							case "may:led7":
+								$scope.led7=data;
+								break;
+							default:
+								break;
+						}					
+
+					})
+					//***end of $scope.$apply***//
+				});
+				//***end of socket.on***//
+			});
+			//***end of async.map***//
+		//需要绑定$scope但不需要脏检查的程序写在这里
+
+		}, function (err, results) {
+			callback(err, results);
+	});
+	/* end - ledsCtrl */
+
+	/* end - angularJS script */
+	</script>
+</body>
+
+</html>
