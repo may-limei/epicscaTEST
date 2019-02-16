@@ -103,7 +103,7 @@ function onListening() {
 var pvs={
   leds:[
 		{ pvname: "may:led0" }, { pvname: "may:led1" }, { pvname: "may:led2" },
-		{ pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname: "may:led7" }]
+		{ pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname: "may:newLED" }]
 }
 
 
@@ -115,15 +115,14 @@ var pvs={
 var moment = require('moment');
 moment().format('YYYY-MM-DD HH:mm:ss.SSS');
 
-io.on('connection', function (socket) {  
+io.on('connection', function (socket) { 
   connect_pvs(pvs.leds,function(err,results){
     async.map(results,function(item,callback){
       item.on("value", function(data) {
-      // console.log('Value:',item.pvName,data);
       socket.emit(item.pvName, data);
-      // console.log(item.pvName+" value change socket event emit");
-      // console.log(item.pvName+" "+moment().format('YYYY-MM-DD HH:mm:ss.SSS')+" 【"+data+"】 value changed (Server emit) ");
-      console.log("(Server emit) "+item.pvName+" "+moment().format('YYYY-MM-DD HH:mm:ss.SSS')+" 【"+data+"】");
+      if(!(item.pvName!="may:newLED")){
+        console.log("(Server emit) "+item.pvName+" "+moment().format('YYYY-MM-DD HH:mm:ss.SSS')+" 【"+data+"】");
+      }
       });  
     })
   });
@@ -131,9 +130,9 @@ io.on('connection', function (socket) {
   connect_pvs_SEVR(pvs.leds,function(err,results){
     async.map(results,function(item,callback){
       item.on("value", function(data) {
-      console.log('Value:',item.pvName,data);
+      // console.log('Value:',item.pvName,data);
       socket.emit(item.pvName, data);
-      console.log(item.pvName+" severity change socket event emit")
+      // console.log(item.pvName+" severity change socket event emit")
       });  
     })
   });
@@ -141,9 +140,9 @@ io.on('connection', function (socket) {
   connect_pvs(pvs.ao,function(err,results){
     async.map(results,function(item,callback){
       item.on("value", function(data) {
-      console.log('Value:',item.pvName,data);
+      // console.log('Value:',item.pvName,data);
       socket.emit(item.pvName, data);
-      console.log(item.pvName+" value change socket event emit")
+      // console.log(item.pvName+" value change socket event emit")
       });  
     })
   });
@@ -151,9 +150,9 @@ io.on('connection', function (socket) {
   connect_pvs_SEVR(pvs.ao,function(err,results){
   async.map(results,function(item,callback){
     item.on("value", function(data) {
-    console.log('Value:',item.pvName,data);
+    // console.log('Value:',item.pvName,data);
     socket.emit(item.pvName, data);
-    console.log(item.pvName+" value change socket event emit")
+    // console.log(item.pvName+" value change socket event emit")
     });  
   })
  });
@@ -183,13 +182,15 @@ async= require('async');
 
 function connect_pvs(pvs,callback){
     async.map(pvs, function(item, callback) {
-        // console.log(item.pvname+" is connect*");
        var pv = new epics.Channel(item.pvname);
        pv.connect(function(err) {
        if(pv.state()){
           pv.monitor()};
           callback(null,pv);
-          console.log(item.pvname+" is connected*");
+          if(!(item.pvname!="may:newLED")){
+            console.log(item.pvname+" is connected");
+            console.log("pv.pvName: "+pv.pvName);
+          }       
       });
     }, function(err,results){
          callback(err,results); 
@@ -204,7 +205,7 @@ function connect_pvs_SEVR(pvs,callback){
        if(pv.state()){
           pv.monitor()};
           callback(null,pv);
-          console.log(item.pvname+"alarm severity is monitored*");
+          // console.log(item.pvname+" alarm severity is monitored");
       });
     }, function(err,results){
          callback(err,results); 
@@ -222,23 +223,20 @@ function createPV(pvname){
     '\nrecord(calc, "$(user):'+pvname+'")\n  {\n  field(DESC, "Counter from 0 to 255")\n  field(SCAN, ".5 second")\n  field(CALC, "(A<256)?A+B:0")\n  field(INPA, "$(user):'+pvname+'.VAL NPP NMS")\n  field(INPB, "1")\n  field(EGU, "Counts")\n  field(HOPR, "10")\n  }',
     options,function(err){
       if(err){
-        console.log(pvname+'写入操作失败.');
+        console.log("may:"+pvname+'  PV创建操作失败.');
       } else{
-        console.log(pvname+'写入操作成功.');
+        console.log("may:"+pvname+'  PV创建操作成功.');
       }
     }
   );
-  // pvs={
-  //   leds:[
-  //     { pvname: "may:led0" }, { pvname: "may:led1" }, { pvname: "may:led2" },
-  //     { pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname: "may:"+pvname }]
-  // }
 }
 fs.readFile('/home/may/pro/pvs/db/leds.db',function(err,data){
-  if(err) {console.log('写入操作失败.');}
+  if(err) {console.log('操作失败.');}
   else {
-    if(data.toString().indexOf("led7")<0) { //若不含led7记录，则添加记录led7
-      createPV("led7");
+    if(data.toString().indexOf("newLED")<0) { //若不含newLED记录，则添加记录newLED
+      createPV("newLED");
+    } else {
+      console.log("当前IOC中存在要创建的同名记录");
     }
   }
 });

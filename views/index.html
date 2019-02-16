@@ -7,13 +7,43 @@
 <link rel="shortcut icon" href="images/favicon.ico" />
 <script src="javascripts/angular.min.js"></script>
 <script src="javascripts/socket.io.js"></script>
-<script src="javascripts/async.js"></script> 
+<script src="javascripts/async.js"></script>
+<script src="javascripts/moment.js"></script>
+
+<style>
+	.p {
+		margin:0;
+		line-height:18px;
+	}
+</style>
+
 </head>
 
 <body ng-app="myApp" ng-controller="ledsCtrl">
     <div>
-		<p> 这是epicsCA的web接口测试</p>
-		<p>led7:{{led7}}</p>
+		<h2> 这是epicsCA的web接口测试</h2><br />
+		<h3> PV变量may:newLED更新情况如下：</h3>
+		<p class="p" >{{date[0]}} &nbsp&nbsp {{ps[0]}}</p>
+		<p class="p" >{{date[1]}} &nbsp&nbsp {{ps[1]}}</p>
+		<p class="p" >{{date[2]}} &nbsp&nbsp {{ps[2]}}</p>
+		<p class="p" >{{date[3]}} &nbsp&nbsp {{ps[3]}}</p>
+		<p class="p" >{{date[4]}} &nbsp&nbsp {{ps[4]}}</p>
+		<p class="p" >{{date[5]}} &nbsp&nbsp {{ps[5]}}</p>
+		<p class="p" >{{date[6]}} &nbsp&nbsp {{ps[6]}}</p>
+		<p class="p" >{{date[7]}} &nbsp&nbsp {{ps[7]}}</p>
+		<p class="p" >{{date[8]}} &nbsp&nbsp {{ps[8]}}</p>
+		<p class="p" >{{date[9]}} &nbsp&nbsp {{ps[9]}}</p>
+		<p class="p" >{{date[10]}} &nbsp&nbsp {{ps[10]}}</p>
+		<p class="p" >{{date[11]}} &nbsp&nbsp {{ps[11]}}</p>
+		<p class="p" >{{date[12]}} &nbsp&nbsp {{ps[12]}}</p>
+		<p class="p" >{{date[13]}} &nbsp&nbsp {{ps[13]}}</p>
+		<p class="p" >{{date[14]}} &nbsp&nbsp {{ps[14]}}</p>
+		<p class="p" >{{date[15]}} &nbsp&nbsp {{ps[15]}}</p>
+		<p class="p" >{{date[16]}} &nbsp&nbsp {{ps[16]}}</p>
+		<p class="p" >{{date[17]}} &nbsp&nbsp {{ps[17]}}</p>
+		<p class="p" >{{date[18]}} &nbsp&nbsp {{ps[18]}}</p>
+		<p class="p" >{{date[19]}} &nbsp&nbsp {{ps[19]}}</p>
+		<p class="p" >{{date[20]}} &nbsp&nbsp {{ps[20]}}</p>
     </div>
 
     <script>
@@ -23,10 +53,10 @@
 		var pvs = {
 			leds:[
 				{ pvname: "may:led0" }, { pvname: "may:led1" }, { pvname: "may:led2" },
-				{ pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname:"may:led7" }]
+				{ pvname: "may:led3" }, { pvname: "may:led4" }, { pvname: "may:led5" }, { pvname:"may:newLED" }]
 		}
 	</script>
-	
+
 	<script>
 		/* start - angularJS script */
 		var app = angular.module('myApp', []);
@@ -41,6 +71,15 @@
 			factory.toString = function(val,num){
 				return val.toString(num);
 			};
+			factory.shift = function(arr){
+				return arr.shift();
+			}
+			factory.push = function(arr,item){
+				return arr.push(item);
+			}
+			factory.now = function(){
+				return moment().format('YYYY-MM-DD HH:mm:ss.SSS');
+			}
 			return factory;
 		});
 		/* end - 自定义函数factory =>  使用一些JS语法或函数*/
@@ -50,7 +89,9 @@
 			$scope.valled=[0,0,1,0,1,1];
 			$scope.led4=4;
 			$scope.led5=5;
-			$scope.led7=7;
+			$scope.newLED=7;
+			$scope.ps=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+			$scope.date=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
 			async.map(pvs.leds, function (item, callback) {
 				socket.on(item.pvname, function (data) {
@@ -74,8 +115,12 @@
 							case "may:led5":
 								$scope.led5=data;
 								break;
-							case "may:led7":
-								$scope.led7=data;
+							case "may:newLED":
+								$scope.newLED=data;
+								JsService.shift($scope.ps);
+								JsService.push($scope.ps,data);
+								JsService.shift($scope.date);
+								JsService.push($scope.date,JsService.now());
 								break;
 							default:
 								break;
